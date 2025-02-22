@@ -1,0 +1,6 @@
+run_name: "test"
+data_dir: "/Users/juliuswiegert/Repositories/Support_Evaluation/test_data"
+working_dir: "/Users/juliuswiegert/Repositories/Support_Evaluation/test_result_dir"
+
+raxml_ng_path: "raxml-ng"
+ufboot_path: "iqtree"
