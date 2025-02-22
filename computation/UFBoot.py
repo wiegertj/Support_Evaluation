@@ -1,15 +1,14 @@
 import os
 import re
 import shutil
+import sys
+import ete3
 import yaml
 import csv
-import time
 import subprocess
-import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import pandas as pd
-
 from utils.tabularize import tabularize_support
+from utils.agreeing_branch_filter import filter_agreeing_bipartitions
 
 """
 Create results directory
@@ -23,10 +22,10 @@ with open(config_path, "r") as file:
     config = yaml.safe_load(file)
 
 result_dir = os.path.join(config["working_dir"], config["run_name"])
-sbs_result_dir = os.path.join(result_dir, "SBS_runs")
+sbs_result_dir = os.path.join(result_dir, "UFBoot_runs")
 os.makedirs(sbs_result_dir, exist_ok=True)
 data_dir = config["data_dir"]
-runtimes_path = os.path.join(config["working_dir"], config["run_name"], "runtimes", "SBS.csv")
+runtimes_path = os.path.join(config["working_dir"], config["run_name"], "runtimes", "UFBoot.csv")
 
 """
 Collect all datasets
@@ -69,17 +68,18 @@ for subfolder, paths in file_paths.items():
 
     subfolder_dir = os.path.join(sbs_result_dir, subfolder)
     os.makedirs(subfolder_dir, exist_ok=True)
+    iqtree_command = [
+        config["ufboot_path"],
+        f"-s", msa_path,
+        f"-m", "GTR+F",
+        f"-t", tree_path,
+        f"-B", "1000",
+        "-redo"
+    ]
 
-    raxml_command = [
-        config["raxml_ng_path"],
-        "--bootstrap",
-        "--model", model_path,
-        f"--bs-trees", "100",
-        "--msa", msa_path,
-        "--redo"]
     try:
 
-        full_command = ["time"] + raxml_command  # -v makes time output verbose
+        full_command = ["time"] + iqtree_command  # -v makes time output verbose
         result = subprocess.run(full_command, cwd=subfolder_dir, check=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True)
         time_output = result.stderr
@@ -98,7 +98,7 @@ for subfolder, paths in file_paths.items():
 
         folder_path = os.path.dirname(model_path)
         for file in os.listdir(folder_path):
-            if file.endswith(('.log', '.bootstraps', '.rba')):
+            if file.endswith(('.iqtree', '.treefile', '.nex', '.contree', '.log')):
                 source_path = os.path.join(folder_path, file)
                 dest_path = os.path.join(subfolder_dir, file)
                 shutil.move(source_path, dest_path)
@@ -107,7 +107,7 @@ for subfolder, paths in file_paths.items():
                 dest_path = os.path.join(subfolder_dir, file)
                 shutil.copy(source_path, dest_path)
     except subprocess.CalledProcessError as e:
-        failed_command = " ".join(raxml_command)
+        failed_command = " ".join(iqtree_command)
         print(f"Error occurred while running the command:\n{failed_command}\n")
         print(f"Error details: {e}")
         res = {"dataset": subfolder, "elapsed_time": None, "cpu_time": None}
@@ -120,27 +120,20 @@ for subfolder, paths in file_paths.items():
             writer.writeheader()  # Write the header only if file doesn't exist
         writer.writerow(res)
 
-    bootstrap_files = [f for f in os.listdir(subfolder_dir) if f.endswith('.bootstraps')]
+    contree = [f for f in os.listdir(subfolder_dir) if f.endswith('.contree')]
+    contree_path = os.path.join(subfolder_dir, contree[0])
+    contree_tree = ete3.Tree(contree_path, format=0)
 
-    if bootstrap_files:
-        bootstrap_path = os.path.join(subfolder_dir, bootstrap_files[0])  # Take the first match
+    """
+    Compute agreement between UFBoot tree with SBS ground truth
+    """
 
-    tree_file_copied = [f for f in os.listdir(subfolder_dir) if f.endswith('.bestTree')]
+    sbs_ground_truth_folder = os.path.join(result_dir, "SBS_runs", dataset_name)
+    sbs_tree = [f for f in os.listdir(sbs_ground_truth_folder) if f.endswith('.support')]
+    sbs_tree_path = os.path.join(sbs_ground_truth_folder, sbs_tree[0])
 
-    if bootstrap_files:
-        tree_file_copied = os.path.join(subfolder_dir, tree_file_copied[0])  # Take the first match
+    sbs_ground_truth_tree = ete3.Tree(sbs_tree_path, format=0)
+    agreement_result = filter_agreeing_bipartitions(sbs_ground_truth_tree, contree_tree, dataset_name, "UFBoot")
 
-    raxml_command = [config["raxml_ng_path"],
-             "--support",
-             "--tree", tree_file_copied,
-             "--bs-trees", bootstrap_path,
-             "--redo"]
-    result = subprocess.run(raxml_command, cwd=subfolder_dir)
-
-    support_path = [f for f in os.listdir(subfolder_dir) if f.endswith('.support')]
-
-    if support_path:
-        support_path = os.path.join(subfolder_dir, support_path[0])  # Take the first match
-
-    tabular_path = os.path.join(subfolder_dir, "tabular_SBS.csv")
-    tabularize_support(support_path, tabular_path, subfolder, "SBS")
+    tabular_path = os.path.join(subfolder_dir, "tabular_UFBoot_agreement.csv")
+    agreement_result.to_csv(tabular_path, index=False)
