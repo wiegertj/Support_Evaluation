@@ -34,22 +34,21 @@ Collect all datasets
 
 file_paths = {}
 
-for root, dirs, files in os.walk(data_dir):
-    newick_path = None
-    model_path = None
-    fasta_path = None
-    msa_type = None
-
-    for file in files:
-        if file.endswith(".bestTree"):
-            newick_path = os.path.join(root, file)
-        elif file.endswith(".bestModel"):
-            model_path = os.path.join(root, file)
-        elif file.endswith(".fasta"):
-            fasta_path = os.path.join(root, file)
-
-        subfolder = os.path.basename(root)
-        file_paths[subfolder] = (newick_path, model_path, fasta_path, subfolder)
+for subfolder in os.listdir(data_dir):
+    subfolder_path = os.path.join(data_dir, subfolder)
+    if os.path.isdir(subfolder_path):
+        newick_path = None
+        model_path = None
+        fasta_path = None
+        for file in os.listdir(subfolder_path):
+            if file.endswith(".bestTree"):
+                newick_path = os.path.join(subfolder_path, file)
+            elif file.endswith(".bestModel"):
+                model_path = os.path.join(subfolder_path, file)
+            elif file.endswith(".fasta"):
+                fasta_path = os.path.join(subfolder_path, file)
+        if newick_path is not None and model_path is not None and fasta_path is not None:
+            file_paths[subfolder] = (newick_path, model_path, fasta_path, subfolder)
 
 """
 Perform SBS, compute support
@@ -80,6 +79,7 @@ for subfolder, paths in file_paths.items():
     try:
 
         full_command = ["time"] + raxml_command  # -v makes time output verbose
+        print(full_command)
         result = subprocess.run(full_command, cwd=subfolder_dir, check=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True)
         time_output = result.stderr
