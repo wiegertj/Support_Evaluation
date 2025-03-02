@@ -1,13 +1,11 @@
 import os
 import re
-import shutil
-import sys
-import ete3
+import pandas as pd
 import yaml
 import csv
 import subprocess
+import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from utils.agreeing_branch_filter import filter_agreeing_bipartitions
 
 """
 Create results directory
@@ -21,10 +19,10 @@ with open(config_path, "r") as file:
     config = yaml.safe_load(file)
 
 result_dir = os.path.join(config["working_dir"], config["run_name"])
-sbs_result_dir = os.path.join(result_dir, "UFBoot_runs")
-os.makedirs(sbs_result_dir, exist_ok=True)
+ebg_result_dir = os.path.join(result_dir, "EBG_light_runs")
+os.makedirs(ebg_result_dir, exist_ok=True)
 data_dir = config["data_dir"]
-runtimes_path = os.path.join(config["working_dir"], config["run_name"], "runtimes", "UFBoot.csv")
+runtimes_path = os.path.join(config["working_dir"], config["run_name"], "runtimes", "EBG_light.csv")
 
 """
 Collect all datasets
@@ -45,12 +43,11 @@ for subfolder in os.listdir(data_dir):
                 model_path = os.path.join(subfolder_path, file)
             elif file.endswith(".fasta"):
                 fasta_path = os.path.join(subfolder_path, file)
-        # Only add the entry if all three file paths are found
         if newick_path is not None and model_path is not None and fasta_path is not None:
             file_paths[subfolder] = (newick_path, model_path, fasta_path, subfolder)
 
 """
-Perform SBS, compute support
+Perform EBG Light
 """
 
 results = []
@@ -65,49 +62,45 @@ for subfolder, paths in file_paths.items():
     msa_path = paths[2]
     dataset_name = paths[3]
 
-    subfolder_dir = os.path.join(sbs_result_dir, subfolder)
+    subfolder_dir = os.path.join(ebg_result_dir, subfolder)
     os.makedirs(subfolder_dir, exist_ok=True)
-    iqtree_command = [
-        config["ufboot_path"],
-        f"-s", msa_path,
-        f"-m", "GTR+F",
-        f"-t", tree_path,
-        f"-B", "1000",
-        "-T", "AUTO",
-        "-redo"
-    ]
 
+    ebg_command = [
+        config["ebg_path"],
+        "-model", model_path,
+        f"-tree", tree_path,
+        "-o", dataset_name,
+        "-msa", msa_path,
+        "-raxmlng", "raxml-ng",
+        "-light",
+        "-redo"]
     try:
 
-        full_command = ["time"] + iqtree_command  # -v makes time output verbose
-        result = subprocess.run(full_command, check=True, stdout=subprocess.PIPE,
+        full_command = ["time"] + ebg_command  # -v makes time output verbose
+        result = subprocess.run(full_command, cwd=subfolder_dir, check=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True)
         time_output = result.stderr
 
         match = re.search(r"(\d+\.\d+) real\s+(\d+\.\d+) user\s+(\d+\.\d+) sys", time_output)
         if match:
-            wallclock_time = float(match.group(1))  # "real"
-            user_time = float(match.group(2))  # "user"
-            sys_time = float(match.group(3))  # "sys"
-            cpu_time = user_time + sys_time  # Total CPU time
+            wallclock_time = float(match.group(1))
+            user_time = float(match.group(2))
+            sys_time = float(match.group(3))
+            cpu_time = user_time + sys_time
             res = {
                 "dataset": subfolder,
                 "elapsed_time": wallclock_time,
                 "cpu_time": cpu_time
             }
-
-        folder_path = os.path.dirname(model_path)
-        for file in os.listdir(folder_path):
-            if file.endswith(('.iqtree', '.treefile', '.nex', '.contree', '.log')):
-                source_path = os.path.join(folder_path, file)
-                dest_path = os.path.join(subfolder_dir, file)
-                shutil.move(source_path, dest_path)
-            if file.endswith((".bestTree")):
-                source_path = os.path.join(folder_path, file)
-                dest_path = os.path.join(subfolder_dir, file)
-                shutil.copy(source_path, dest_path)
+        table_path = os.path.join(subfolder_dir, dataset_name, dataset_name + "_features.csv")
+        features_df = pd.read_csv(table_path)
+        tabular_df = features_df[["dataset", "branchId", "prediction_lower5", "prediction_lower10", "prediction_median", "prediction_median_lower5_distance", "prediction_median_lower10_distance", "prediction_bs_over_70", "prediction_bs_over_75", "prediction_bs_over_80", "prediction_bs_over_85", "prediction_uncertainty_bs_over_80", "prediction_uncertainty_bs_over_85", "prediction_uncertainty_bs_over_75", "prediction_uncertainty_bs_over_70"]]
+        tabular_path = os.path.join(subfolder_dir, "tabular_ebg_light_support.csv")
+        excluded_columns = ["branchId", "dataset"]
+        tabular_df = tabular_df.rename(columns=lambda x: f"{x}_ebg_light" if x not in excluded_columns else x)
+        tabular_df.to_csv(tabular_path, index=False)
     except subprocess.CalledProcessError as e:
-        failed_command = " ".join(iqtree_command)
+        failed_command = " ".join(ebg_command)
         print(f"Error occurred while running the command:\n{failed_command}\n")
         print(f"Error details: {e}")
         res = {"dataset": subfolder, "elapsed_time": None, "cpu_time": None}
@@ -119,21 +112,3 @@ for subfolder, paths in file_paths.items():
         if write_header:
             writer.writeheader()  # Write the header only if file doesn't exist
         writer.writerow(res)
-
-    contree = [f for f in os.listdir(subfolder_dir) if f.endswith('.contree')]
-    contree_path = os.path.join(subfolder_dir, contree[0])
-    contree_tree = ete3.Tree(contree_path, format=0)
-
-    """
-    Compute agreement between UFBoot tree with SBS ground truth
-    """
-
-    sbs_ground_truth_folder = os.path.join(result_dir, "SBS_runs", dataset_name)
-    sbs_tree = [f for f in os.listdir(sbs_ground_truth_folder) if f.endswith('.support')]
-    sbs_tree_path = os.path.join(sbs_ground_truth_folder, sbs_tree[0])
-
-    sbs_ground_truth_tree = ete3.Tree(sbs_tree_path, format=0)
-    agreement_result = filter_agreeing_bipartitions(sbs_ground_truth_tree, contree_tree, dataset_name, "UFBoot")
-
-    tabular_path = os.path.join(subfolder_dir, "tabular_UFBoot_agreement.csv")
-    agreement_result.to_csv(tabular_path, index=False)

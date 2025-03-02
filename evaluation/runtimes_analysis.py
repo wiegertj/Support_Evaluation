@@ -47,7 +47,7 @@ speedup_df = pd.DataFrame(index=tools, columns=tools)
 for t1 in tools:
     for t2 in tools:
         if t1 == t2:
-            speedup_df.loc[t1, t2] = 1.0  # Speedup against itself is 1
+            speedup_df.loc[t1, t2] = 1.0
         else:
             speedup_df.loc[t1, t2] = (df_pivot[t2] / df_pivot[t1]).mean()
 

@@ -1,0 +1,48 @@
+name: pipeline_test_env
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bzip2=1.0.8=hfdf4475_7
+  - ca-certificates=2025.1.31=h8857fd0_0
+  - gmp=6.3.0=hf036a51_2
+  - iqtree=2.4.0=h6ed3961_0
+  - libcxx=19.1.7=hf95d169_0
+  - libffi=3.4.6=h281671d_0
+  - libgfortran=5.0.0=13_2_0_h97931a8_3
+  - libgfortran5=13.2.0=h2873a65_3
+  - liblzma=5.6.4=hd471939_0
+  - liblzma-devel=5.6.4=hd471939_0
+  - libsqlite=3.49.1=hdb6dae5_1
+  - libzlib=1.3.1=hd23fc13_2
+  - llvm-openmp=19.1.7=ha54dae1_0
+  - mpi=1.0=openmpi
+  - ncurses=6.5=h0622a9a_3
+  - openmpi=4.1.6=h7406208_101
+  - openssl=3.4.1=hc426f3f_0
+  - pip=22.1.2=pyhd8ed1ab_0
+  - python=3.8.20=h4f978b9_2_cpython
+  - raxml-ng=1.2.2=hb53313b_1
+  - readline=8.2=h9e318b2_1
+  - setuptools=70.3.0=pyhd8ed1ab_0
+  - tk=8.6.13=h1abcd95_1
+  - wheel=0.45.1=pyhd8ed1ab_0
+  - xz=5.6.4=h357f2ed_0
+  - xz-gpl-tools=5.6.4=h357f2ed_0
+  - xz-tools=5.6.4=hd471939_0
+  - zlib=1.3.1=hd23fc13_2
+  - pip:
+      - biopython==1.83
+      - ebg==0.13.3
+      - ete3==3.1.3
+      - lightgbm==4.6.0
+      - networkx==3.1
+      - numpy==1.24.4
+      - pandas==2.0.3
+      - python-dateutil==2.9.0.post0
+      - pytz==2025.1
+      - pyyaml==6.0.2
+      - scipy==1.10.1
+      - six==1.17.0
+      - tzdata==2025.1
+prefix: /Users/juliuswiegert/anaconda3/envs/pipeline_test_env

@@ -3,11 +3,9 @@ import re
 import shutil
 import yaml
 import csv
-import time
 import subprocess
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import pandas as pd
 
 from utils.tabularize import tabularize_support
 
@@ -73,13 +71,12 @@ for subfolder, paths in file_paths.items():
         config["raxml_ng_path"],
         "--bootstrap",
         "--model", model_path,
-        f"--bs-trees", "100",
+        f"--bs-trees", "1000",
         "--msa", msa_path,
         "--redo"]
     try:
 
         full_command = ["time"] + raxml_command  # -v makes time output verbose
-        print(full_command)
         result = subprocess.run(full_command, cwd=subfolder_dir, check=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True)
         time_output = result.stderr

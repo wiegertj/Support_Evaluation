@@ -4,3 +4,4 @@ working_dir: "/Users/juliuswiegert/Repositories/Support_Evaluation/test_result_d
 
 raxml_ng_path: "raxml-ng"
 ufboot_path: "iqtree"
+ebg_path: "ebg"

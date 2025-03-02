@@ -18,7 +18,10 @@ runtimes_dir = os.path.join(result_dir, "runtimes")
     Combine all runtimes
 """
 
-csv_files = [f for f in os.listdir(runtimes_dir) if f.endswith(".csv")]
+csv_files = [
+    f for f in os.listdir(runtimes_dir)
+    if f.endswith(".csv") and f not in {"runtimes_all.csv", "speedups.csv"}
+]
 
 dataframes = []
 for csv_file in csv_files:
@@ -35,7 +38,6 @@ merged_df.to_csv(output_path, index=False)
     Combine all support estimates
 """
 
-#    # Recursively find CSV files that start with "tabular_" and end with ".csv"
 csv_files = []
 for root, _, files in os.walk(result_dir):
     for file in files:
@@ -62,9 +64,6 @@ for base_name, files in grouped_files.items():
             print(f"Error reading {file}: {e}")
     if df_list:
         concatenated_dfs[base_name] = pd.concat(df_list, ignore_index=True)
-
-# Merge all concatenated dataframes on 'dataset' and 'branchId'
-# We use an outer join to preserve all rows
 
 merged_df = reduce(
     lambda left, right: pd.merge(left, right, on=['dataset', 'branchId'], how='inner'),

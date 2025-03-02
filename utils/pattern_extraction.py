@@ -1,11 +1,7 @@
 import os
 import re
-import shutil
-
 import pandas as pd
 import yaml
-import csv
-import time
 import subprocess
 import sys
 
@@ -59,7 +55,7 @@ for subfolder in os.listdir(data_dir):
             file_paths[subfolder] = (newick_path, model_path, fasta_path, subfolder)
 
 """
-Compute no. of patterns
+Compute # of patterns
 """
 
 results = []
